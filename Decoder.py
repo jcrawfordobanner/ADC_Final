@@ -1,4 +1,5 @@
 import numpy as np
+import collections
 
 def decoder(rxmsg,stmchn):
     """
@@ -19,9 +20,9 @@ def decoder(rxmsg,stmchn):
     # Iterate and update the rest of the trellis
     # for sym in rxmsg[::len(stmchn[0][0])]: # only gives the first element, not the whole section
     count = 0
-    for sym in range(0,len(rxmsg),r)
+    for sym in range(0,len(rxmsg),r):
         count = count + 1 # what message portion are we on (start from 1)
-        msg_section = rxmsg(sym:sym+r+1)
+        msg_section = rxmsg[sym:sym+r+1]
         for state in range(ns):
             s = bin(state)[2:] # extract the binary representation of the state
             p_as = s[1:] # predecessor state after shift, before adding in x[n]
@@ -30,18 +31,35 @@ def decoder(rxmsg,stmchn):
                 p_dec = int(p,2) # decimal representation
                 x_n = s[0] # the value of x[n] that shifts from predecessor state to current state
                 ti = stmchn[p_dec][x_n] # parity bits generated during transition
-                di = min_ham(msg_section, ti) # hamming distance
-                if di < min_dp[0]:
-                    min_dp = [di,p]
-            trellis[state][count] = min_dp
+                di = min_ham(msg_section, ti) # cost (hamming distance)
+                if di < min_dp[0]: # Check if cost is smaller than saved minimum
+                    min_dp = [di,p] # Update minimum cost and according state
+            trellis[state,count] = min_dp # Save minimum cost and according predecessor to trellis
 
+    # Find the total minimum cost of the most likely path
+    min_cost = np.min(trellis[:,-1,0])
+    # Find the state associated with the most likely path
+    end_state = np.argmin(trellis[:,-1,0])
 
+    # Backtrack and find the most likely sequence of states
+    # Front-end insertion because backtracking (finds the last bit, first)
+    # Use a deque because front-end insertion
+    most_likely_states = collections.deque()
+    # Use a second deque to keep track of predecssor states
+    preds = collections.deque()
+    preds.append(end_state) # add the state to start backtracking from
+    # Begin backtracking
+    for bt_idx in np.flip(range(tl)):
+        most_likely_states.appendleft(preds[-1])
+        preds.append(trellis[preds[-1],bt_idx,1])
+
+    most_likely_states = list(most_likely_states)
 
 def min_ham(rx,trial):
     dist = 0;
     for i in range(len(trial)):
-        if(trial[i] ~= rx[i]):
-            dist++;
+        if(trial[i] != rx[i]):
+            dist = dist + 1;
     return dist
 
 """
