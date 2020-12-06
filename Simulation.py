@@ -33,10 +33,12 @@ def addNoise(encodedSignal):
 if __name__ == "__main__":
     sig = generateRandomSignal(100)
     enc_sig = Encoder.Encoder(sig)
+    enc_sig_2 = enc_sig.split(" ")
+    enc_sig_3 = ''.join(enc_sig_2)
     noisy_sig = addNoise(enc_sig)
     K = 3; # Constraint length
     state_machine = Decoder.state_machine_gen(K-1);
-    decoded_sig = Decoder.thedecoder_part2_tenyearslater(noisy_sig,state_machine)
+    decoded_sig = Decoder.thedecoder_part2_tenyearslater(enc_sig_3,state_machine)
     print("Original",sig)
     print("Encoded",enc_sig)
     print("Noisy",noisy_sig)
