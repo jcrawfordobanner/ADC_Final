@@ -163,8 +163,9 @@ def thedecoder_part2_tenyearslater(rxmsg,stmchn):
                 x_n = s[0] # the value of x[n] that shifts from predecessor state to current state
                 ti = stmchn[p_dec][int(x_n)] # parity bits generated during transition
                 di = min_ham(msg_section, ti) # cost (hamming distance)
+                tot_di = trellisham[p_dec,count-1][0] + di
                 if di < min_dp[0]: # Check if cost is smaller than saved minimum
-                    min_dp = (di,p) # Update minimum cost and according state
+                    min_dp = (tot_di,p) # Update minimum cost and according state
             trellisham[state,count] = min_dp # Save minimum cost and according predecessor to trellis
 
     ### Backtracking
@@ -174,10 +175,10 @@ def thedecoder_part2_tenyearslater(rxmsg,stmchn):
     min_cost = np.min(trellisham[:,-1])
 
     # Find the state associated with the most likely path
-    end_state = np.argmin(trellisham[:,-1][1])
-    print("final trellis")
-    print(trellisham[:,:])
-
+    end_state = np.argmin(trellisham[:,-1][0])
+    #print("final trellis")
+    #print(trellisham[:,:])
+    #print(state_machine)
     # Backtrack and find the most likely sequence of states
     # Front-end insertion because backtracking (finds the last bit, first)
     # Use a deque because front-end insertion
@@ -185,19 +186,37 @@ def thedecoder_part2_tenyearslater(rxmsg,stmchn):
     # Use a second deque to keep track of predecssor states
     preds = collections.deque()
     preds.append(end_state) # add the state to start backtracking from
+    # format(end_state,'#0'+str(len(stmchn[0,0])+2)+'b')[2:]
     # Begin backtracking
-    for bt_idx in np.flip(range(tl),0):
-        most_likely_states.appendleft(preds[-1])
-        preds.append(trellisam[preds[-1],bt_idx])
+    states = []
+    print(end_state)
+    states.append(format(end_state,'#0'+str(len(stmchn[0,0])+2)+'b')[2:])
+    prev = trellisham[end_state,-1][1]
+    states.append(prev)
+    for bt_idx in np.flip(range(1,tl-1),0):
+        prev = trellisham[int(prev,2),bt_idx][1]
+        states.append(prev)
+        #most_likely_states.appendleft(preds[-1])
+        #print("bt_indx", bt_idx)
+        #print("preds[-1]", preds[-1])
+        #preds.append(trellisham[preds[-1],bt_idx])
 
-    most_likely_states = list(most_likely_states)
+    #most_likely_states = list(most_likely_states)
+    print("states",states)
+    states.reverse()
 
-    return [b for b in most_likely_states[1:]]
+    #return [b for b in most_likely_states[1:]]
+    return ''.join([b[0] for b in states[1:]])
 
 if __name__ == "__main__":
     print("Testing decoding.")
     test =  "111101000110"
+    check = "101100"
     K = 3; # Constraint length
     state_machine = state_machine_gen(K-1);
     decoded = thedecoder_part2_tenyearslater(test,state_machine)
-    print(decoded)
+    print("decoded",decoded)
+    if(decoded==check):
+        print("YAY")
+    else:
+        print("BOO")
