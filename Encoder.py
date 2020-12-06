@@ -7,7 +7,7 @@ def Encoder(signal):
         p0 = int(signal[i-2])^int(signal[i-1])^int(signal[i])
         # the second parity bit is the current value xored with the prior value
         p1 = int(signal[i-1])^int(signal[i])
-        transmit = transmit+ str(p0)+str(p1) #encode parity bits to send to modulator
+        transmit = transmit + str(p0)+ " " + str(p1) + " "#encode parity bits to send to modulator
 
     return transmit
 
