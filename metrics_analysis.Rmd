@@ -1,0 +1,24 @@
+---
+title: "R Notebook"
+#output: html_notebook
+---
+
+```{r}
+library(data.table)
+library(ggplot2)
+```
+
+```{r}
+results <- fread("C:/Users/abusa/Documents/GitHub/ADC_Final/simulation_results.csv")
+```
+
+
+```{r}
+ggplot(results, aes(x = as.integer(), y = , color = )) +
+    geom_point() +  labs(
+        title = "",
+        x = "",
+        y = ""
+        
+         ) 
+```

@@ -13,6 +13,8 @@ import Encoder
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+from os import path
+import csv
 
 class Viterbi:
     def __init__(self, msg, K=5):
@@ -227,38 +229,64 @@ def addDistributedNoise(encodedSignal, lenNoise):
         new_sig[i] = str(round(np.random.normal(0,1)+int(new_sig[i]))%2)
     return "".join(new_sig)
 
+def save_to_csv( signal_length, constraint_length, noise_length,
+                    avg_hamming_distance, filename="simulation_results.csv", clearing_file=False):
+        """
+        Same simulation metrics to csv
+        """
+
+        metrics = {
+            "length_signal" : signal_length,
+            "constraint_length" : constraint_length,
+            "noise_length" : noise_length,
+            "avg_hamming_distance": avg_hamming_distance,
+
+        }
+
+
+        new_file = not path.exists(filename)
+
+        options = 'w+' if clearing_file else 'a'  # Truncate the file if clearing_file set True, else append to file
+
+        with open(filename, options) as csvfile:
+            csvwriter = csv.writer(csvfile)
+
+            if new_file or clearing_file:
+                csvwriter.writerow(metrics.keys())
+
+            csvwriter.writerow(metrics.values())
+def generate_metrics():
+        for j in range(50,500,10):
+
+            signal_length = j
+            noise_length = 20
+            mean_hamming_distance = 0
+            constraint_length = 3
+
+            for i in range(1000):
+                sig = generateRandomSignal(signal_length)
+                enc_sig = Encoder.Encoder(sig)
+                enc_sig_2 = enc_sig.split(" ")
+                enc_sig_3 = ''.join(enc_sig_2)
+                #noisy_sig = addSigNoise(enc_sig)
+                noisy_sig = addDistributedNoise(enc_sig, noise_length)
+                K = 3 # Constraint length
+                state_machine = Decoder.state_machine_gen(K-1)
+                decoded_sig = Decoder.thedecoder_part2_tenyearslater(noisy_sig,state_machine)
+                mean_hamming_distance += Decoder.min_ham(decoded_sig,sig)
+            mean_hamming_distance = mean_hamming_distance / 1000
+            save_to_csv(signal_length, constraint_length, noise_length,
+                                mean_hamming_distance, filename="simulation_results.csv", clearing_file=False)
+            print("mean hamming", mean_hamming_distance)
+
+
 if __name__ == "__main__":
-    sig = generateRandomSignal(100)
-    # enc_sig = Encoder.Encoder(sig)
-    # enc_sig_2 = enc_sig.split(" ")
-    # enc_sig_3 = ''.join(enc_sig_2)
-    # noisy_sig = addSigNoise(enc_sig)
-    # K = 3 # Constraint length
-    # state_machine = Decoder.state_machine_gen(K-1)
-    # decoded_sig = Decoder.thedecoder_part2_tenyearslater(enc_sig_3,state_machine)
-
-    vit = Viterbi(sig)
-    decoded_sig = vit.decode(vit.enc_sig)
-
-
-
-    print("Original",sig)
-    print("Encoded",vit.enc_sig_spaced)
-    # print("Noisy",noisy_sig)
-    print("Decoded",decoded_sig)
-    # print("Hamming Distance between encoded and noisy signal", Decoder.min_ham(enc_sig_3, noisy_sig))
-    print("Hamming Distance",Decoder.min_ham(decoded_sig,sig))
-
-    # mean_hamming_distance = 0
-    # for i in range(10000):
-    #     sig = generateRandomSignal(100)
-    #     enc_sig = Encoder.Encoder(sig)
-    #     enc_sig_2 = enc_sig.split(" ")
-    #     enc_sig_3 = ''.join(enc_sig_2)
-    #     noisy_sig = addSigNoise(enc_sig)
-    #     K = 3 # Constraint length
-    #     state_machine = Decoder.state_machine_gen(K-1)
-    #     decoded_sig = Decoder.thedecoder_part2_tenyearslater(noisy_sig,state_machine)
-    #     mean_hamming_distance += Decoder.min_ham(decoded_sig,sig)
-    # mean_hamming_distance = mean_hamming_distance / 10000
-    # print("mean hamming", mean_hamming_distance)
+    #sig = generateRandomSignal(100)
+    #enc_sig = Encoder.Encoder(sig)
+    #enc_sig_2 = enc_sig.split(" ")
+    #enc_sig_3 = ''.join(enc_sig_2)
+    #noisy_sig = addSigNoise(enc_sig)
+    #K = 3 # Constraint length
+    #state_machine = Decoder.state_machine_gen(K-1)
+    #decoded_sig = Decoder.thedecoder_part2_tenyearslater(enc_sig_3,state_machine)
+    generate_metrics()
