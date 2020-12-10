@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import random
 
 class Viterbi:
-    def __init__(self, msg, K=3):
+    def __init__(self, msg, K=5):
         self.K = K # Constraint length
         self.state_machine = self._state_machine_gen(self.K-1) # k-1 is the state window length
         self.msg = msg
@@ -30,12 +30,20 @@ class Viterbi:
         return dist
 
     def _parity_bits(self,s):
+        """
+        Using generator polynomials: (11101) and (11010)
+        Accordingly assumes that the state provided is of window size 4
+        """
         # the first parity bit is the newest value xored with the second oldest value xored with the oldest bit
         # p0 = int(signal[i-2])^int(signal[i-1])^int(signal[i])
         # the second parity bit is the current value xored with the prior value
         # p1 = int(signal[i-1])^int(signal[i])
-        return [str(0^int(s[0])^int(s[1]))+str(0^int(s[0])), # Parity bits if input is 0
-                str(1^int(s[0])^int(s[1]))+str(1^int(s[0]))] # Parity bits if input is 1
+        # p0 = int(s[0])^int(s[1])
+        # p1 = int(s[0])
+        p0 = int(s[0])^int(s[1])^int(s[3])
+        p1 = int(s[0])^int(s[2])
+        return [str(0^p0)+str(0^p1), # Parity bits if input is 0
+                str(1^p0)+str(1^p1)] # Parity bits if input is 1
 
     def _state_machine_gen(self,K):
         s = 0
@@ -46,19 +54,19 @@ class Viterbi:
         return stm
 
     def _encode(self,signal):
-        signal = "00" + signal
+        signal = "".zfill(self.K-1) + signal
         transmit = ""
         x_n = 0 # initial value for x_n, the incoming message bit
         p_bts = "00" # initial value for parity bits string
 
-        for i in range(2,len(signal)): #for every bit put into the encoder
+        for i in range(self.K-1,len(signal)): #for every bit put into the encoder
             x_n = int(signal[i]) # the incoming message
             # The current state is string of {signal[i-1],signal[i-2]}
             # So take signal[i-2 to i-1] and flip it
             # Select out the correct column from the function output using the incoming message bit value
-            p_bts = self._parity_bits(signal[i-2:i][::-1])[x_n]
+            p_bts = self._parity_bits(signal[i-self.K+1:i][::-1])[x_n]
 
-            transmit = transmit + p_bts[x_n][0] + " " + p_bts[x_n][1] + " "
+            transmit = transmit + p_bts[0] + " " + p_bts[1] + " "
         return transmit
 
     def _despace_encode(self,signal):
@@ -69,7 +77,7 @@ class Viterbi:
         self.enc_sig_spaced = self._encode(self.msg)
         self.enc_sig = self._despace_encode(self.enc_sig_spaced)
 
-    def decode(self,rxmsg,stmchn=self.state_machine):
+    def decode(self,rxmsg,stmchn=None):
         """
         State machine 2d = row state column state value tuple (transmitted bit, received bit)
         Trellis values = 2d array
@@ -101,6 +109,8 @@ class Viterbi:
                 columns = message bit value (0 or 1)
                 value = string of parity bits
         """
+        ### Initialize state machine
+        stmchn = self.state_machine if stmchn==None else stmchn
         ### Initialize Trellis
         ns = len(stmchn) # num of trellis rows, which is num states bc state machine is list of lists
         r = len(stmchn[0][0]) # num of parity bits
@@ -109,10 +119,11 @@ class Viterbi:
 
         # Initialize first column in trellis
         trellisham[:,:]=np.inf
+        trellisham[:,0]=[(np.inf,"nan")]
         trellisham[0,0]=(0,"nan")
-        trellisham[1,0]=(np.inf,"nan")
-        trellisham[2,0]=(np.inf,"nan")
-        trellisham[3,0]=(np.inf,"nan")
+        # trellisham[1,0]=(np.inf,"nan")
+        # trellisham[2,0]=(np.inf,"nan")
+        # trellisham[3,0]=(np.inf,"nan")
         count = 0
         # print("initial trellis")
         # print(trellisham[:,:])
@@ -122,16 +133,17 @@ class Viterbi:
             count = count + 1 # what message portion are we on (start from 1)
             msg_section = rxmsg[sym:sym+r+1]
             for state in range(ns):
-                s = bin(state)[2:].zfill(2) # extract the binary representation of the state
+                s = bin(state)[2:].zfill(self.K-1) # extract the binary representation of the state
                 p_as = s[1:] # predecessor state after shift, before adding in x[n]
                 min_dp = (np.inf,0) # stores minimum hamming distance and predecessor state
                 for p in [p_as+'1',p_as+'0']:
-                    #print("pee",p)
                     p_dec = int(p,2) # decimal representation
                     x_n = s[0] # the value of x[n] that shifts from predecessor state to current state
+                    # print("p",p,"pdec",p_dec,"x",x_n,"s",s,"c",count)
                     ti = stmchn[p_dec][int(x_n)] # parity bits generated during transition
                     di = self.min_ham(msg_section, ti) # cost (hamming distance)
                     tot_di = trellisham[p_dec,count-1][0] + di
+                    # print("tot",trellisham[p_dec,count-1][0])
                     if di < min_dp[0]: # Check if cost is smaller than saved minimum
                         min_dp = (tot_di,p) # Update minimum cost and according state
                 trellisham[state,count] = min_dp # Save minimum cost and according predecessor to trellis
@@ -148,26 +160,15 @@ class Viterbi:
         #print(trellisham[:,:])
         #print(state_machine)
         # Backtrack and find the most likely sequence of states
-        # Front-end insertion because backtracking (finds the last bit, first)
-        # Use a deque because front-end insertion
-        most_likely_states = collections.deque()
-        # Use a second deque to keep track of predecssor states
-        preds = collections.deque()
-        preds.append(end_state) # add the state to start backtracking from
-        # format(end_state,'#0'+str(len(stmchn[0,0])+2)+'b')[2:]
         # Begin backtracking
         states = []
         # print(end_state)
-        states.append(format(end_state,'#0'+str(len(stmchn[0,0])+2)+'b')[2:])
+        states.append(format(end_state,'#0'+str(self.K-1+2)+'b')[2:])
         prev = trellisham[end_state,-1][1]
         states.append(prev)
         for bt_idx in np.flip(range(1,tl-1),0):
             prev = trellisham[int(prev,2),bt_idx][1]
             states.append(prev)
-            #most_likely_states.appendleft(preds[-1])
-            #print("bt_indx", bt_idx)
-            #print("preds[-1]", preds[-1])
-            #preds.append(trellisham[preds[-1],bt_idx])
 
         #most_likely_states = list(most_likely_states)
         # print("states",states)
@@ -228,31 +229,36 @@ def addDistributedNoise(encodedSignal, lenNoise):
 
 if __name__ == "__main__":
     sig = generateRandomSignal(100)
-    enc_sig = Encoder.Encoder(sig)
-    enc_sig_2 = enc_sig.split(" ")
-    enc_sig_3 = ''.join(enc_sig_2)
-    noisy_sig = addSigNoise(enc_sig)
-    K = 3 # Constraint length
-    state_machine = Decoder.state_machine_gen(K-1)
-    decoded_sig = Decoder.thedecoder_part2_tenyearslater(enc_sig_3,state_machine)
+    # enc_sig = Encoder.Encoder(sig)
+    # enc_sig_2 = enc_sig.split(" ")
+    # enc_sig_3 = ''.join(enc_sig_2)
+    # noisy_sig = addSigNoise(enc_sig)
+    # K = 3 # Constraint length
+    # state_machine = Decoder.state_machine_gen(K-1)
+    # decoded_sig = Decoder.thedecoder_part2_tenyearslater(enc_sig_3,state_machine)
+
+    vit = Viterbi(sig)
+    decoded_sig = vit.decode(vit.enc_sig)
+
+
 
     print("Original",sig)
-    print("Encoded",enc_sig)
-    print("Noisy",noisy_sig)
+    print("Encoded",vit.enc_sig_spaced)
+    # print("Noisy",noisy_sig)
     print("Decoded",decoded_sig)
-    print("Hamming Distance between encoded and noisy signal", Decoder.min_ham(enc_sig_3, noisy_sig))
+    # print("Hamming Distance between encoded and noisy signal", Decoder.min_ham(enc_sig_3, noisy_sig))
     print("Hamming Distance",Decoder.min_ham(decoded_sig,sig))
 
-    mean_hamming_distance = 0
-    for i in range(10000):
-        sig = generateRandomSignal(100)
-        enc_sig = Encoder.Encoder(sig)
-        enc_sig_2 = enc_sig.split(" ")
-        enc_sig_3 = ''.join(enc_sig_2)
-        noisy_sig = addSigNoise(enc_sig)
-        K = 3 # Constraint length
-        state_machine = Decoder.state_machine_gen(K-1)
-        decoded_sig = Decoder.thedecoder_part2_tenyearslater(noisy_sig,state_machine)
-        mean_hamming_distance += Decoder.min_ham(decoded_sig,sig)
-    mean_hamming_distance = mean_hamming_distance / 10000
-    print("mean hamming", mean_hamming_distance)
+    # mean_hamming_distance = 0
+    # for i in range(10000):
+    #     sig = generateRandomSignal(100)
+    #     enc_sig = Encoder.Encoder(sig)
+    #     enc_sig_2 = enc_sig.split(" ")
+    #     enc_sig_3 = ''.join(enc_sig_2)
+    #     noisy_sig = addSigNoise(enc_sig)
+    #     K = 3 # Constraint length
+    #     state_machine = Decoder.state_machine_gen(K-1)
+    #     decoded_sig = Decoder.thedecoder_part2_tenyearslater(noisy_sig,state_machine)
+    #     mean_hamming_distance += Decoder.min_ham(decoded_sig,sig)
+    # mean_hamming_distance = mean_hamming_distance / 10000
+    # print("mean hamming", mean_hamming_distance)
