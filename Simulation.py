@@ -17,8 +17,9 @@ from os import path
 import csv
 
 class Viterbi:
-    def __init__(self, msg, K=5):
+    def __init__(self, msg, K=5, r=4):
         self.K = K # Constraint length
+        self.r = r # Number of parity bits
         self.state_machine = self._state_machine_gen(self.K-1) # k-1 is the state window length
         self.msg = msg
         self.enc_sig_spaced = self._encode(self.msg)
@@ -37,15 +38,30 @@ class Viterbi:
         Accordingly assumes that the state provided is of window size 4
         """
         # the first parity bit is the newest value xored with the second oldest value xored with the oldest bit
-        # p0 = int(signal[i-2])^int(signal[i-1])^int(signal[i])
         # the second parity bit is the current value xored with the prior value
-        # p1 = int(signal[i-1])^int(signal[i])
-        # p0 = int(s[0])^int(s[1])
-        # p1 = int(s[0])
-        p0 = int(s[0])^int(s[1])^int(s[3])
-        p1 = int(s[0])^int(s[2])
-        return [str(0^p0)+str(0^p1), # Parity bits if input is 0
-                str(1^p0)+str(1^p1)] # Parity bits if input is 1
+
+        # Make it possible to loop through conveniently using K and r
+        if self.K == 3:
+            p0 = int(s[0])^int(s[1])
+            p1 = int(s[0])
+            return [str(0^p0)+str(0^p1), # Parity bits if input is 0
+                    str(1^p0)+str(1^p1)]
+        elif self.K == 5:
+            p0 = int(s[0])^int(s[1])^int(s[3])
+            p1 = int(s[0])^int(s[2])
+            if self.r == 2:
+                return [str(0^p0)+str(0^p1), # Parity bits if input is 0
+                        str(1^p0)+str(1^p1)]
+            else:
+                p2 = int(s[0])^int(s[1])^int(s[2])
+                p3 = int(s[0])^int(s[1])^int(s[2])^int(s[3])
+                return [str(0^p0)+str(0^p1)+str(0^p2)+str(0^p3), # Parity bits if input is 0
+                        str(1^p0)+str(1^p1)+str(1^p2)+str(0^p3)] # Parity bits if input is 1
+        else:
+            p0 = int(s[0])^int(s[1])
+            p1 = int(s[0])
+            return [str(0^p0)+str(0^p1), # Parity bits if input is 0
+                    str(1^p0)+str(1^p1)]
 
     def _state_machine_gen(self,K):
         s = 0
@@ -59,7 +75,7 @@ class Viterbi:
         signal = "".zfill(self.K-1) + signal
         transmit = ""
         x_n = 0 # initial value for x_n, the incoming message bit
-        p_bts = "00" # initial value for parity bits string
+        p_bts = "".zfill(len(self.state_machine[0,0])) # initial value for parity bits string
 
         for i in range(self.K-1,len(signal)): #for every bit put into the encoder
             x_n = int(signal[i]) # the incoming message
@@ -68,7 +84,7 @@ class Viterbi:
             # Select out the correct column from the function output using the incoming message bit value
             p_bts = self._parity_bits(signal[i-self.K+1:i][::-1])[x_n]
 
-            transmit = transmit + p_bts[0] + " " + p_bts[1] + " "
+            transmit = transmit + " ".join(p_bts) + " "
         return transmit
 
     def _despace_encode(self,signal):
@@ -262,17 +278,15 @@ def generate_metrics():
             noise_length = 20
             mean_hamming_distance = 0
             constraint_length = 3
+            sig = generateRandomSignal(signal_length)
+            vit = Viterbi(sig)
 
             for i in range(1000):
                 sig = generateRandomSignal(signal_length)
-                enc_sig = Encoder.Encoder(sig)
-                enc_sig_2 = enc_sig.split(" ")
-                enc_sig_3 = ''.join(enc_sig_2)
+                vit.re_encode(sig)
                 #noisy_sig = addSigNoise(enc_sig)
-                noisy_sig = addDistributedNoise(enc_sig, noise_length)
-                K = 3 # Constraint length
-                state_machine = Decoder.state_machine_gen(K-1)
-                decoded_sig = Decoder.thedecoder_part2_tenyearslater(noisy_sig,state_machine)
+                noisy_sig = addDistributedNoise(vit.enc_sig, noise_length)
+                decoded_sig = vit.decode(noisy_sig)
                 mean_hamming_distance += Decoder.min_ham(decoded_sig,sig)
             mean_hamming_distance = mean_hamming_distance / 1000
             save_to_csv(signal_length, constraint_length, noise_length,
@@ -289,4 +303,13 @@ if __name__ == "__main__":
     #K = 3 # Constraint length
     #state_machine = Decoder.state_machine_gen(K-1)
     #decoded_sig = Decoder.thedecoder_part2_tenyearslater(enc_sig_3,state_machine)
-    generate_metrics()
+    sig = generateRandomSignal(100)
+    vit = Viterbi(sig)
+    decoded_sig = vit.decode(vit.enc_sig)
+    print("Original",sig)
+    print("Encoded",vit.enc_sig_spaced)
+    # print("Noisy",noisy_sig)
+    print("Decoded ",decoded_sig)
+    # print("Hamming Distance between encoded and noisy signal", Decoder.min_ham(enc_sig_3, noisy_sig))
+    print("Hamming Distance",vit.min_ham(decoded_sig,sig))
+    # generate_metrics()
