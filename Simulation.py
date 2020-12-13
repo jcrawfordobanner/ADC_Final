@@ -272,44 +272,45 @@ def save_to_csv( signal_length, constraint_length, noise_length,
 
             csvwriter.writerow(metrics.values())
 def generate_metrics():
-        for j in range(50,500,10):
+    kr_list = ([5,2], [3,2], [5,4])
+    for z in kr_list:
+        for j in range(100,500,100):
 
             signal_length = j
             noise_length = 20
+            K = z[0]
+            r = z[1]
+            #print("k r", K, r)
             mean_hamming_distance = 0
-            constraint_length = 3
-            sig = generateRandomSignal(signal_length)
-            vit = Viterbi(sig)
+
+
 
             for i in range(1000):
+                #sig = generateRandomSignal(signal_length)
+                #vit.re_encode(sig)
                 sig = generateRandomSignal(signal_length)
+                vit = Viterbi(sig, K=K, r=r)
                 vit.re_encode(sig)
+                #print("sig", sig)
                 #noisy_sig = addSigNoise(enc_sig)
-                noisy_sig = addDistributedNoise(vit.enc_sig, noise_length)
+                noisy_sig = addDistributedNoise(vit.enc_sig_spaced, noise_length)
                 decoded_sig = vit.decode(noisy_sig)
-                mean_hamming_distance += Decoder.min_ham(decoded_sig,sig)
+                mean_hamming_distance += vit.min_ham(decoded_sig,sig)
             mean_hamming_distance = mean_hamming_distance / 1000
-            save_to_csv(signal_length, constraint_length, noise_length,
-                                mean_hamming_distance, filename="simulation_results.csv", clearing_file=False)
+            save_to_csv(signal_length = signal_length, constraint_length = [K,r], noise_length = noise_length,
+                                avg_hamming_distance = mean_hamming_distance, filename="simulation_results.csv", clearing_file=False)
             print("mean hamming", mean_hamming_distance)
 
 
 if __name__ == "__main__":
-    #sig = generateRandomSignal(100)
-    #enc_sig = Encoder.Encoder(sig)
-    #enc_sig_2 = enc_sig.split(" ")
-    #enc_sig_3 = ''.join(enc_sig_2)
-    #noisy_sig = addSigNoise(enc_sig)
-    #K = 3 # Constraint length
-    #state_machine = Decoder.state_machine_gen(K-1)
-    #decoded_sig = Decoder.thedecoder_part2_tenyearslater(enc_sig_3,state_machine)
-    sig = generateRandomSignal(100)
-    vit = Viterbi(sig)
-    decoded_sig = vit.decode(vit.enc_sig)
-    print("Original",sig)
-    print("Encoded",vit.enc_sig_spaced)
-    # print("Noisy",noisy_sig)
-    print("Decoded ",decoded_sig)
-    # print("Hamming Distance between encoded and noisy signal", Decoder.min_ham(enc_sig_3, noisy_sig))
-    print("Hamming Distance",vit.min_ham(decoded_sig,sig))
-    # generate_metrics()
+
+    # sig = generateRandomSignal(100)
+    # vit = Viterbi(sig)
+    # decoded_sig = vit.decode(vit.enc_sig)
+    # print("Original",sig)
+    # print("Encoded",vit.enc_sig_spaced)
+    # # print("Noisy",noisy_sig)
+    # print("Decoded ",decoded_sig)
+    # # print("Hamming Distance between encoded and noisy signal", Decoder.min_ham(enc_sig_3, noisy_sig))
+    # print("Hamming Distance",vit.min_ham(decoded_sig,sig))
+    generate_metrics()

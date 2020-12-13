@@ -12,13 +12,53 @@ library(ggplot2)
 results <- fread("C:/Users/abusa/Documents/GitHub/ADC_Final/simulation_results.csv")
 ```
 
+```{r}
+result_2_plot <- results[46:nrow(results), ]
+results_3_plot <- subset(result_2_plot, noise_length %in% c(0,5,30, 95))
+results_4_plot <- subset(result_2_plot, length_signal %in% c(100,200,300,400))
+
+```
+
+
+
+
 
 ```{r}
-ggplot(results, aes(x = as.integer(), y = , color = )) +
+ggplot(results_3_plot, aes(x = as.integer(length_signal), y = avg_hamming_distance, color = as.factor(noise_length))) +
     geom_point() +  labs(
-        title = "",
-        x = "",
-        y = ""
+        title = "Average Hamming Distance vs Signal Length",
+        x = "Length of signal (number of bits)",
+        y = "Average Hamming Distance of 1000 samples"
         
-         ) 
+         ) + scale_color_discrete("# of bits exposed to noise", labels=c('0', '5', '30', '95')) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(), axis.line = element_line(colour = "black"))
 ```
+
+
+
+```{r}
+ggplot(results_4_plot, aes(x = as.integer(noise_length), y = avg_hamming_distance, color = as.factor(length_signal))) +
+    geom_point() +  labs(
+        title = "Average Hamming Distance vs Noise Length",
+        x = "Number of bits exposed to noise",
+        y = "Average Hamming Distance of 1000 samples"
+        
+         ) + scale_color_discrete("Signal length (# of bits)", labels=c('100', '200', '300', '400')) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(), axis.line = element_line(colour = "black"))
+```
+
+
+
+```{r}
+ggplot(results, aes(x = as.factor(constraint_length), y = avg_hamming_distance, color = as.factor(length_signal))) +
+    geom_point() +  labs(
+        title = "Average Hamming Distance vs Constraint Length",
+        x = "[K,r]",
+        y = "Average Hamming Distance of 1000 samples"
+        
+         ) +  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(), axis.line = element_line(colour = "black"))
+```
+
+
+
