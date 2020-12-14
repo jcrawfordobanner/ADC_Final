@@ -162,7 +162,7 @@ class Viterbi:
                     di = self.min_ham(msg_section, ti) # cost (hamming distance)
                     tot_di = trellisham[p_dec,count-1][0] + di
                     # print("tot",trellisham[p_dec,count-1][0])
-                    if di < min_dp[0]: # Check if cost is smaller than saved minimum
+                    if tot_di < min_dp[0]: # Check if cost is smaller than saved minimum
                         min_dp = (tot_di,p) # Update minimum cost and according state
                 trellisham[state,count] = min_dp # Save minimum cost and according predecessor to trellis
 
@@ -173,7 +173,7 @@ class Viterbi:
         min_cost = np.min(trellisham[:,-1])
 
         # Find the state associated with the most likely path
-        end_state = np.argmin(trellisham[:,-1][0])
+        end_state = np.argmin(trellisham[:,-1])
         #print("final trellis")
         #print(trellisham[:,:])
         #print(state_machine)
@@ -193,6 +193,7 @@ class Viterbi:
         states.reverse()
 
         #return [b for b in most_likely_states[1:]]
+        #print(trellisham)
         return ''.join([b[0] for b in states[1:]])
 
 def generateRandomSignal(desired_length):
@@ -277,7 +278,6 @@ def generate_metrics():
         for j in range(100,500,100):
 
             signal_length = j
-            noise_length = 20
             K = z[0]
             r = z[1]
             #print("k r", K, r)
@@ -293,24 +293,25 @@ def generate_metrics():
                 vit.re_encode(sig)
                 #print("sig", sig)
                 #noisy_sig = addSigNoise(enc_sig)
+                noise_length = signal_length/5
                 noisy_sig = addDistributedNoise(vit.enc_sig_spaced, noise_length)
                 decoded_sig = vit.decode(noisy_sig)
                 mean_hamming_distance += vit.min_ham(decoded_sig,sig)
             mean_hamming_distance = mean_hamming_distance / 1000
-            save_to_csv(signal_length = signal_length, constraint_length = [K,r], noise_length = noise_length,
-                                avg_hamming_distance = mean_hamming_distance, filename="simulation_results.csv", clearing_file=False)
-            print("mean hamming", mean_hamming_distance)
+            #save_to_csv(signal_length = signal_length, constraint_length = [K,r], noise_length = noise_length,
+                                #avg_hamming_distance = mean_hamming_distance, filename="simulation_results.csv", clearing_file=False)
+            print("k_r",z,"signal length", signal_length, "mean hamming", mean_hamming_distance)
 
 
 if __name__ == "__main__":
 
-    # sig = generateRandomSignal(100)
-    # vit = Viterbi(sig)
+    # sig = generateRandomSignal(1000)
+    # #sig = "110000"
+    # vit = Viterbi(sig,3,2)
+    # #noisy_sig = addSigNoise(vit.enc_sig_spaced)
     # decoded_sig = vit.decode(vit.enc_sig)
     # print("Original",sig)
     # print("Encoded",vit.enc_sig_spaced)
-    # # print("Noisy",noisy_sig)
     # print("Decoded ",decoded_sig)
-    # # print("Hamming Distance between encoded and noisy signal", Decoder.min_ham(enc_sig_3, noisy_sig))
     # print("Hamming Distance",vit.min_ham(decoded_sig,sig))
     generate_metrics()
