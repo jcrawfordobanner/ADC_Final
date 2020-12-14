@@ -20,6 +20,9 @@ results_4_plot <- subset(result_2_plot, length_signal %in% c(100,200,300,400))
 ```
 
 
+```{r}
+results_kr <- results
+```
 
 
 
@@ -50,15 +53,25 @@ panel.background = element_blank(), axis.line = element_line(colour = "black"))
 
 
 ```{r}
-ggplot(results, aes(x = as.factor(constraint_length), y = avg_hamming_distance, color = as.factor(length_signal))) +
+ggplot(results, aes(x = as.factor(length_signal), y = avg_hamming_distance, color = as.factor(constraint_length))) +
     geom_point() +  labs(
         title = "Average Hamming Distance vs Constraint Length",
-        x = "[K,r]",
+        x = "Signal length (# of bits)",
         y = "Average Hamming Distance of 1000 samples"
         
          ) +  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-panel.background = element_blank(), axis.line = element_line(colour = "black"))
+panel.background = element_blank(), axis.line = element_line(colour = "black"))  + scale_color_discrete("[Constraint Length, Parity Bits]", labels=c('[3,2]', '[5,2]', '[5,4]'))
 ```
 
 
+```{r}
 
+ggplot(results, aes(x = as.factor(length_signal), y = avg_hamming_distance, color = as.factor(noise_length))) +
+    geom_point() +  scale_shape_manual(values = c(16, 16,16, 16, 16, 25))+  labs(
+        title = "Average Hamming Distance vs Constraint Length",
+        x = "Signal length (# of bits)",
+        y = "Average Hamming Distance of 1000 samples"
+        
+         ) +  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(), axis.line = element_line(colour = "black")) 
+```
