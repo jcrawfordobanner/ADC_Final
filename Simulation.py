@@ -44,14 +44,19 @@ class Viterbi:
         if self.K == 3:
             p0 = int(s[0])^int(s[1])
             p1 = int(s[0])
-            return [str(0^p0)+str(0^p1), # Parity bits if input is 0
-                    str(1^p0)+str(1^p1)]
+            if self.r == 2:
+                return [str(0^p0)+str(0^p1), # Parity bits if input is 0
+                        str(1^p0)+str(1^p1)] # Parity bits if input is 1
+            else:
+                p2 = int(s[1])
+                return [str(0^p0)+str(0^p1)+str(0^p2)+str(0), # Parity bits if input is 0
+                        str(1^p0)+str(1^p1)+str(1^p2)+str(1)] # Parity bits if input is 1
         elif self.K == 5:
             p0 = int(s[0])^int(s[1])^int(s[3])
             p1 = int(s[0])^int(s[2])
             if self.r == 2:
                 return [str(0^p0)+str(0^p1), # Parity bits if input is 0
-                        str(1^p0)+str(1^p1)]
+                        str(1^p0)+str(1^p1)] # Parity bits if input is 1
             else:
                 p2 = int(s[0])^int(s[1])^int(s[2])
                 p3 = int(s[0])^int(s[1])^int(s[2])^int(s[3])
