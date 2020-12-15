@@ -17,13 +17,20 @@ from os import path
 import csv
 
 class Viterbi:
-    def __init__(self, msg, K=5, r=4):
+    def __init__(self, msg, K=3, r=2, V=3):
         self.K = K # Constraint length
         self.r = r # Number of parity bits
+        self.V = V # Analog encoding value
         self.state_machine = self._state_machine_gen(self.K-1) # k-1 is the state window length
         self.msg = msg
         self.enc_sig_spaced = self._encode(self.msg)
         self.enc_sig = self._despace_encode(self.enc_sig_spaced)
+        self._sf_stm = self._sf_smg(self.K-1)
+        self.sf_enc_sig = np.zeros(len(msg))
+        self._sf_encode(self.msg)
+        self._sf_noisy = np.zeros(len(msg))
+        self._add_AWGN()
+        # print(self.state_machine,self._sf_stm)
 
     def min_ham(self,rx,trial):
         dist = 0;
@@ -48,6 +55,7 @@ class Viterbi:
                 return [str(0^p0)+str(0^p1), # Parity bits if input is 0
                         str(1^p0)+str(1^p1)] # Parity bits if input is 1
             else:
+                self.r = 4
                 p2 = int(s[1])
                 return [str(0^p0)+str(0^p1)+str(0^p2)+str(0), # Parity bits if input is 0
                         str(1^p0)+str(1^p1)+str(1^p2)+str(1)] # Parity bits if input is 1
@@ -58,11 +66,13 @@ class Viterbi:
                 return [str(0^p0)+str(0^p1), # Parity bits if input is 0
                         str(1^p0)+str(1^p1)] # Parity bits if input is 1
             else:
+                self.r = 4
                 p2 = int(s[0])^int(s[1])^int(s[2])
                 p3 = int(s[0])^int(s[1])^int(s[2])^int(s[3])
                 return [str(0^p0)+str(0^p1)+str(0^p2)+str(0^p3), # Parity bits if input is 0
                         str(1^p0)+str(1^p1)+str(1^p2)+str(0^p3)] # Parity bits if input is 1
         else:
+            self.r = 2
             p0 = int(s[0])^int(s[1])
             p1 = int(s[0])
             return [str(0^p0)+str(0^p1), # Parity bits if input is 0
@@ -170,6 +180,96 @@ class Viterbi:
                     if tot_di < min_dp[0]: # Check if cost is smaller than saved minimum
                         min_dp = (tot_di,p) # Update minimum cost and according state
                 trellisham[state,count] = min_dp # Save minimum cost and according predecessor to trellis
+
+        ### Backtracking
+
+        # Find the total minimum cost of the most likely path
+
+        min_cost = np.min(trellisham[:,-1])
+
+        # Find the state associated with the most likely path
+        end_state = np.argmin(trellisham[:,-1])
+        #print("final trellis")
+        #print(trellisham[:,:])
+        #print(state_machine)
+        # Backtrack and find the most likely sequence of states
+        # Begin backtracking
+        states = []
+        # print(end_state)
+        states.append(format(end_state,'#0'+str(self.K-1+2)+'b')[2:])
+        prev = trellisham[end_state,-1][1]
+        states.append(prev)
+        for bt_idx in np.flip(range(1,tl-1),0):
+            prev = trellisham[int(prev,2),bt_idx][1]
+            states.append(prev)
+
+        #most_likely_states = list(most_likely_states)
+        # print("states",states)
+        states.reverse()
+
+        #return [b for b in most_likely_states[1:]]
+        #print(trellisham)
+        return ''.join([b[0] for b in states[1:]])
+
+    def _sf_smg(self,K):
+        s = 0
+        p_b0 = "".zfill(self.r) # initial value for parity bits string
+        p_b1 = "".zfill(self.r) # initial value for parity bits string
+        stm=np.zeros([2**K,2],dtype=float)
+        for k in range(2**K):
+            s=format(k,'#0'+str(K+2)+'b')[2:]
+            [p_b0,p_b1]=self._parity_bits(s)
+            stm[k,0]=-self.V+2*self.V/(2**(self.r)-1)*int(p_b0,2)
+            stm[k,1]=-self.V+2*self.V/(2**(self.r)-1)*int(p_b1,2)
+        return stm
+
+    def _sf_encode(self,signal):
+        signal = "".zfill(self.K-1) + signal
+        x_n = 0 # initial value for x_n, the incoming message bit (arbitrary)
+        p_bts = "".zfill(self.r) # initial value for parity bits string
+
+        for i in range(self.K-1,len(signal)): #for every bit put into the encoder
+            x_n = int(signal[i]) # the incoming message
+            # The current state is string of {signal[i-1],signal[i-2]}
+            # So take signal[i-2 to i-1] and flip it
+            # Select out the correct column from the function output using the incoming message bit value
+            p_bts = self._parity_bits(signal[i-self.K+1:i][::-1])[x_n]
+            # print(-self.V,2*self.V,2**(self.r-1),2*self.V/(2**(self.r)-1),int(p_bts,2))
+            self.sf_enc_sig[i-self.K+1] = -self.V+2*self.V/(2**(self.r)-1)*int(p_bts,2)
+        return self.sf_enc_sig
+
+    def _add_AWGN(self):
+        self._sf_noisy = np.random.default_rng().normal(0,1,self.sf_enc_sig.size)+self.sf_enc_sig
+
+    def sf_decode(self,rxmsg,stmchn=None):
+        stmchn = self._sf_stm if stmchn==None else stmchn
+
+        ns = len(stmchn)
+        tl = len(rxmsg)+1
+        trellisham = np.zeros([ns,tl],dtype=object)
+        trellisham[:,:]=np.inf
+        trellisham[:,0]=[(np.inf,"nan")]
+        trellisham[0,0]=(0,"nan")
+        # print("initial trellis")
+        # print(trellisham[:,:])
+
+        for sym in range(0,len(rxmsg)):
+            msg_section = rxmsg[sym]
+            for state in range(ns):
+                s = bin(state)[2:].zfill(self.K-1)
+                p_as = s[1:]
+                min_dp = (np.inf,0)
+                for p in [p_as+'1',p_as+'0']:
+                    p_dec = int(p,2)
+                    x_n = s[0]
+                    # print("p",p,"pdec",p_dec,"x",x_n,"s",s,"c",count)
+                    ti = stmchn[p_dec][int(x_n)]
+                    di = (msg_section-ti)**2
+                    tot_di = trellisham[p_dec,sym][0] + di
+                    # print("tot",trellisham[p_dec,count-1][0])
+                    if tot_di < min_dp[0]: # Check if cost is smaller than saved minimum
+                        min_dp = (tot_di,p) # Update minimum cost and according state
+                trellisham[state,sym+1] = min_dp # Save minimum cost and according predecessor to trellis
 
         ### Backtracking
 
@@ -313,14 +413,19 @@ def generate_metrics():
 if __name__ == "__main__":
 
     # sig = generateRandomSignal(1000)
-    # #sig = "110000"
-    # vit = Viterbi(sig,3,2)
-    # #noisy_sig = addSigNoise(vit.enc_sig_spaced)
-    # decoded_sig = vit.decode(vit.enc_sig)
+    # # sig = "110000"
+    # vit = Viterbi(sig,5,2)
+    # noisy_sig = addSigNoise(vit.enc_sig_spaced)
+    # decoded_sig = vit.decode(noisy_sig)
+    # sf_dec_sig = vit.sf_decode(vit._sf_noisy)
     # print("Original",sig)
     # print("Encoded",vit.enc_sig_spaced)
+    # print("Sf Enc:",vit.sf_enc_sig)
+    # print("Sf AWGN",vit._sf_noisy)
     # print("Decoded ",decoded_sig)
-    # print("Hamming Distance",vit.min_ham(decoded_sig,sig))
+    # print("Sf Deco:",sf_dec_sig)
+    # print("Hard Distance",vit.min_ham(decoded_sig,sig))
+    # print("Soft Distance",vit.min_ham(sf_dec_sig,sig))
     #generate_metrics()
 
     kr_list = ([3,2], [3,4],[5,2], [5,4])
@@ -334,6 +439,7 @@ if __name__ == "__main__":
             r = z[1]
 
             mean_hamming_distance = 0
+            mean_hamming_distance_sf = 0
             for i in range(100):
                 #sig = generateRandomSignal(signal_length)
                 #vit.re_encode(sig)
@@ -343,8 +449,11 @@ if __name__ == "__main__":
                 #print("sig", sig)
                 noisy_sig = addSigNoise(vit.enc_sig_spaced)
                 decoded_sig = vit.decode(noisy_sig)
+                decoded_sig_sf = vit.sf_decode(vit._sf_noisy)
                 mean_hamming_distance += vit.min_ham(decoded_sig,sig)
+                mean_hamming_distance_sf += vit.min_ham(decoded_sig_sf,sig)
             mean_hamming_distance = mean_hamming_distance / 100
-            save_to_csv(signal_length = signal_length, constraint_length = z, noise_length = "NA",
-                                avg_hamming_distance = mean_hamming_distance, filename="simulation_results_awgn.csv", clearing_file=False)
-            print("k_r",z,"signal length", signal_length, "mean hamming", mean_hamming_distance)
+            mean_hamming_distance_sf = mean_hamming_distance_sf / 100
+            # save_to_csv(signal_length = signal_length, constraint_length = z, noise_length = "NA",
+            #                     avg_hamming_distance = mean_hamming_distance, filename="simulation_results_awgn.csv", clearing_file=False)
+            print("k_r",z,"signal length", signal_length, "hard hamming", mean_hamming_distance, "soft hamming", mean_hamming_distance_sf)
