@@ -278,34 +278,36 @@ def save_to_csv( signal_length, constraint_length, noise_length,
 
             csvwriter.writerow(metrics.values())
 def generate_metrics():
-    kr_list = ([5,2], [3,2], [5,4])
+    kr_list = ([3,2], [3,4],[5,2], [5,4])
+
     for z in kr_list:
-        for j in range(100,500,100):
+        for j in range(100,600,50):
+            for q in np.linspace(0,1,10):
 
-            signal_length = j
-            K = z[0]
-            r = z[1]
-            #print("k r", K, r)
-            mean_hamming_distance = 0
+                signal_length = j
+                K = z[0]
+                r = z[1]
+                noise_length = int(signal_length*q)
+                mean_hamming_distance = 0
 
 
 
-            for i in range(1000):
-                #sig = generateRandomSignal(signal_length)
-                #vit.re_encode(sig)
-                sig = generateRandomSignal(signal_length)
-                vit = Viterbi(sig, K=K, r=r)
-                vit.re_encode(sig)
-                #print("sig", sig)
-                #noisy_sig = addSigNoise(enc_sig)
-                noise_length = signal_length/5
-                noisy_sig = addDistributedNoise(vit.enc_sig_spaced, noise_length)
-                decoded_sig = vit.decode(noisy_sig)
-                mean_hamming_distance += vit.min_ham(decoded_sig,sig)
-            mean_hamming_distance = mean_hamming_distance / 1000
-            #save_to_csv(signal_length = signal_length, constraint_length = [K,r], noise_length = noise_length,
-                                #avg_hamming_distance = mean_hamming_distance, filename="simulation_results.csv", clearing_file=False)
-            print("k_r",z,"signal length", signal_length, "mean hamming", mean_hamming_distance)
+                for i in range(100):
+                    #sig = generateRandomSignal(signal_length)
+                    #vit.re_encode(sig)
+                    sig = generateRandomSignal(signal_length)
+                    vit = Viterbi(sig, K=K, r=r)
+                    vit.re_encode(sig)
+                    #print("sig", sig)
+                    #noisy_sig = addSigNoise(enc_sig)
+
+                    noisy_sig = addDistributedNoise(vit.enc_sig_spaced, noise_length)
+                    decoded_sig = vit.decode(noisy_sig)
+                    mean_hamming_distance += vit.min_ham(decoded_sig,sig)
+                mean_hamming_distance = mean_hamming_distance / 100
+                save_to_csv(signal_length = signal_length, constraint_length = z, noise_length = noise_length,
+                                    avg_hamming_distance = mean_hamming_distance, filename="simulation_results.csv", clearing_file=False)
+                print("k_r",z,"signal length", signal_length, "mean hamming", mean_hamming_distance)
 
 
 if __name__ == "__main__":
@@ -319,4 +321,30 @@ if __name__ == "__main__":
     # print("Encoded",vit.enc_sig_spaced)
     # print("Decoded ",decoded_sig)
     # print("Hamming Distance",vit.min_ham(decoded_sig,sig))
-    generate_metrics()
+    #generate_metrics()
+
+    kr_list = ([3,2], [3,4],[5,2], [5,4])
+
+    for z in kr_list:
+        for j in range(100,600,50):
+
+
+            signal_length = j
+            K = z[0]
+            r = z[1]
+
+            mean_hamming_distance = 0
+            for i in range(100):
+                #sig = generateRandomSignal(signal_length)
+                #vit.re_encode(sig)
+                sig = generateRandomSignal(signal_length)
+                vit = Viterbi(sig, K=K, r=r)
+                vit.re_encode(sig)
+                #print("sig", sig)
+                noisy_sig = addSigNoise(vit.enc_sig_spaced)
+                decoded_sig = vit.decode(noisy_sig)
+                mean_hamming_distance += vit.min_ham(decoded_sig,sig)
+            mean_hamming_distance = mean_hamming_distance / 100
+            save_to_csv(signal_length = signal_length, constraint_length = z, noise_length = "NA",
+                                avg_hamming_distance = mean_hamming_distance, filename="simulation_results_awgn.csv", clearing_file=False)
+            print("k_r",z,"signal length", signal_length, "mean hamming", mean_hamming_distance)
